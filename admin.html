@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Dashboard - SDN Mekarsari</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { primary: '#d97706', secondary: '#b45309', dark: '#111827', surface: '#1f2937' },
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="icon" id="dynamic-favicon" href="assets/img/favicon.png">
+    <!-- PDF & Excel Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets/js/admin.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        /* Custom scrollbar for sidebar */
+        aside ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        aside ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        aside ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 99px;
+        }
+
+        aside ::-webkit-scrollbar-thumb:hover {
+            background: #60a5fa;
+        }
+
+        /* Custom scrollbar for main content */
+        main ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        main ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        main ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 99px;
+        }
+
+        main ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Loader Animations */
+        @keyframes loading {
+            0% {
+                transform: translateX(-100%);
+                width: 30%;
+            }
+
+            50% {
+                width: 60%;
+            }
+
+            100% {
+                transform: translateX(200%);
+                width: 30%;
+            }
+        }
+
+        @keyframes spin-slow {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .animate-spin-slow {
+            animation: spin-slow 3s linear infinite;
+        }
+    </style>
+</head>
+
+<body x-data="adminApp" x-init="init(); updateFavicon()"
+    class="text-gray-900 antialiased h-screen flex overflow-hidden">
+
+
+    <!-- Login Overlay -->
+    <div x-show="!isLoggedIn" x-cloak
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900 overflow-hidden">
+        
+        <!-- Login Sync Loader -->
+        <div x-show="initialLoading" x-transition:leave="transition ease-in duration-500" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-sm">
+            <div class="relative flex flex-col items-center">
+                <!-- Sync Icon with Spin -->
+                <div class="mb-6 relative">
+                    <div class="absolute inset-0 bg-orange-400 rounded-full blur-xl opacity-20 animate-pulse"></div>
+                    <svg class="w-16 h-16 text-white animate-spin-slow relative z-10" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </div>
+
+                <!-- Loading Status -->
+                <div class="text-center space-y-3">
+                    <p class="text-xs font-black text-white uppercase tracking-[0.5em] animate-pulse">Sinkronisasi Data</p>
+                    <div class="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div class="h-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)] animate-[loading_2s_ease-in-out_infinite] rounded-full"
+                            style="width: 30%"></div>
+                    </div>
+                    <p class="text-[10px] text-orange-200 font-medium" x-text="settings.school_name"></p>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="!initialLoading"
+            class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 animate-in fade-in zoom-in duration-300">
+            <div class="text-center mb-6">
+                <template x-if="settings.school_logo">
+                    <img :src="settings.school_logo" class="w-16 h-16 object-contain mx-auto mb-3" alt="Logo Sekolah">
+                </template>
+                <template x-if="!settings.school_logo">
+                    <div
+                        class="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                    </div>
+                </template>
+                <h1 class="text-xl font-bold text-gray-900">Portal Admin</h1>
+                <p class="text-gray-900 text-xs mt-1">SDN Mekarsari - Dashboard Manajemen</p>
+            </div>
+
+            <form @submit.prevent="doLogin" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1 tracking-wide uppercase">Email / Nama
+                        Pengguna</label>
+                    <input type="email" x-model="email" required placeholder="email"
+                        class="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1 tracking-wide uppercase">Kata Sandi</label>
+                    <input type="password" x-model="password" required placeholder="••••••••"
+                        class="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all">
+                </div>
+                <button type="submit" :disabled="loading"
+                    class="w-full bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold py-2.5 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
+                    <span x-show="!loading">Masuk</span>
+                    <span x-show="loading">Memverifikasi...</span>
+                </button>
+            </form>
+            <p class="text-center text-[9px] text-gray-900 mt-4 italic">AREA MEMBER - HANYA DEVELOPER YANG BISA
+                MENAMBAHKAN
+                ADMIN</p>
+            <div class="text-center mt-4 text-[9px] text-gray-400 tracking-wide border-t border-gray-100 pt-3">
+                &copy; 2026 Digitalized by
+                <a href="https://about-wrwn.ct.ws/?i=2" target="_blank" rel="noopener noreferrer"
+                    class="text-orange-500 hover:text-orange-500 font-medium underline underline-offset-2 transition-colors relative z-[120]">WiraWebSolusi</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Sidebar Backdrop -->
+    <div x-show="sidebarOpen" @click="sidebarOpen = false" x-transition.opacity
+        class="fixed inset-0 bg-blue-700/60 backdrop-blur-sm z-40 md:hidden" x-cloak></div>
+
+    <!-- Sidebar Orange -->
+    <aside x-show="sidebarOpen" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
+        x-transition:leave="transition ease-in duration-300" x-transition:leave-start="translate-x-0"
+        x-transition:leave-end="-translate-x-full" x-cloak
+        class="w-80 bg-orange-500 flex flex-col h-full shadow-2xl z-50 absolute md:relative">
+        <!-- Header Branding -->
+        <div
+            class="py-10 px-6 flex flex-col items-center justify-center gap-1 bg-orange-600 border-b border-orange-700 text-center shadow-inner">
+            <div class="flex flex-col leading-tight z-20 relative">
+                <span class="text-xl font-black text-white leading-none mb-1 shadow-sm uppercase"
+                    x-text="settings.school_name || 'SDN Admin'"></span>
+                <span class="text-[10px] text-white uppercase tracking-[0.2em] font-bold leading-none mt-1 opacity-90"
+                    x-show="settings.hero_subtitle" x-text="settings.hero_subtitle"></span>
+            </div>
+        </div>
+        <!-- Navigation -->
+        <div class="overflow-y-auto flex-1 py-4 px-3 space-y-1">
+            <template x-for="item in menus">
+                <button
+                    @click="currentTab = item.id; localStorage.setItem('sdn_admin_tab', item.id); if(window.innerWidth <= 768) sidebarOpen = false;"
+                    :class="currentTab === item.id ? 'bg-orange-700 text-white shadow-md' : 'text-orange-50 hover:bg-orange-600 hover:text-white'"
+                    class="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all rounded-lg group">
+                    <span x-html="item.icon" class="w-5 h-5 opacity-80 group-hover:opacity-100"></span>
+                    <span x-text="item.label"></span>
+                </button>
+            </template>
+        </div>
+        <!-- Footer Links -->
+        <div class="p-4 border-t border-orange-400 space-y-1">
+            <button @click="doLogout"
+                class="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-red-600 hover:text-white rounded-lg font-medium transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Logout
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main x-show="isLoggedIn" x-cloak class="flex-1 h-full flex flex-col overflow-hidden bg-gray-50">
+
+        <!-- Topbar -->
+        <header
+            class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 shadow-sm">
+            <div class="flex items-center gap-4">
+                <button @click="sidebarOpen = !sidebarOpen"
+                    class="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-lg transition">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+                <h1 class="text-xl font-bold text-blue-700 capitalize"
+                    x-text="menus.find(m => m.id === currentTab)?.label">Dashboard</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-sm font-medium text-gray-500" x-show="loading">Memuat data...</span>
+                <div class="flex flex-col items-right text-right hidden md:block">
+                    <div class="text-xs font-bold text-gray-900 leading-tight"
+                        x-text="settings.admin_name || 'Administrator'"></div>
+                    <div class="text-[10px] text-gray-400 uppercase tracking-tighter"
+                        x-text="settings.admin_role || 'Operator Sekolah'"></div>
+                </div>
+                <button @click="openAdminProfileModal()"
+                    class="w-10 h-10 rounded-full bg-orange-600 text-white flex items-center justify-center font-black shadow-md hover:scale-105 transition-all border-2 border-white ring-1 ring-gray-200 overflow-hidden">
+                    <template x-if="settings.admin_photo">
+                        <img :src="settings.admin_photo" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="!settings.admin_photo">
+                        <span x-text="(settings.admin_name || 'A')[0].toUpperCase()"></span>
+                    </template>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-auto p-6">
+
+            <!-- Dashboard View (Hard Reset Strategy) -->
+            <!-- Dashboard View -->
+            <div x-show="currentTab === 'dashboard'" x-cloak class="space-y-6">
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div
+                        class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                        <p class="text-sm font-bold text-blue-700/50 uppercase tracking-widest mb-2">Total Pendaftar
+                        </p>
+                        <p class="text-4xl font-extrabold text-blue-700" x-text="students.length"></p>
+                    </div>
+                    <div
+                        class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                        <p class="text-sm font-bold text-amber-900/50 uppercase tracking-widest mb-2">Total Berita
+                        </p>
+                        <p class="text-4xl font-extrabold text-amber-600" x-text="posts.length"></p>
+                    </div>
+                    <div
+                        class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                        <p class="text-sm font-bold text-blue-700/50 uppercase tracking-widest mb-2">Total Guru</p>
+                        <p class="text-4xl font-extrabold text-orange-600" x-text="teachers.length"></p>
+                    </div>
+                    <div
+                        class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md border-r-4 border-red-500">
+                        <p class="text-sm font-bold text-red-900/50 uppercase tracking-widest mb-2">Pesan Masuk</p>
+                        <p class="text-4xl font-extrabold text-red-600" x-text="messages.length"></p>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                        <h3 class="text-base font-bold text-gray-800 mb-4 border-b pb-2">Status Pendaftaran</h3>
+                        <div id="containerRegistration" x-ignore class="h-[280px] min-h-[280px] w-full relative">
+                            <canvas id="chartRegistration"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                        <h3 class="text-base font-bold text-gray-800 mb-4 border-b pb-2">Distribusi Gender</h3>
+                        <div id="containerGender" x-ignore class="h-[280px] min-h-[280px] w-full relative">
+                            <canvas id="chartGender"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                        <h3 class="text-base font-bold text-gray-800 mb-4 border-b pb-2">Kategori Pendaftaran</h3>
+                        <div id="containerCategory" x-ignore class="h-[280px] min-h-[280px] w-full relative">
+                            <canvas id="chartCategory"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Students View -->
+            <div x-show="currentTab === 'students'" x-cloak class="space-y-4">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <!-- Toolbar -->
+                    <div
+                        class="p-4 border-b border-gray-200 bg-gray-50/50 flex flex-wrap gap-4 items-center justify-between">
+                        <div class="flex flex-wrap gap-3 items-center">
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor font-bold">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </span>
+                                <input type="text" x-model="searchQuery" @input="currentPage = 1"
+                                    placeholder="Cari Nama / NIK / Ortu..."
+                                    class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-64 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all">
+                            </div>
+
+                            <div class="flex items-center gap-2 border-l pl-3" x-show="selectedIds.length > 0">
+                                <span class="text-sm font-bold text-orange-600"
+                                    x-text="selectedIds.length + ' dipilih'"></span>
+                                <select
+                                    @change="if($event.target.value) { if($event.target.value === 'delete') bulkDelete(); else bulkUpdateStatus($event.target.value); $event.target.value = ''; }"
+                                    class="text-xs bg-white border border-gray-300 rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-orange-500">
+                                    <option value="">Aksi Massal...</option>
+                                    <option value="accepted">Terima Semua</option>
+                                    <option value="rejected">Tolak Semua</option>
+                                    <option value="delete">Hapus Permanen</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button @click="if(confirm('Sinkronkan struktur kolom di Google Sheet? Aksi ini akan memperbaiki data yang bergeser (seperti Hobi di kolom NIK).')) { 
+                                loading = true; 
+                                fetch(GAS_URL + '?action=alignHeaders').then(r => r.json()).then(res => { 
+                                    alert(res.message); 
+                                    refreshAll(); 
+                                }).finally(() => loading = false); 
+                            }"
+                                class="bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 border border-gray-200 shadow-sm transition-all active:scale-95 uppercase tracking-wider">
+                                <svg class="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Perbaiki Kolom
+                            </button>
+                            <button @click="exportStudentsExcel()"
+                                class="bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 border border-emerald-100 shadow-sm transition-all active:scale-95 uppercase tracking-wider">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Excel Rekap
+                            </button>
+                            <button @click="exportStudentsPDF()"
+                                class="bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white px-3 py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 border border-rose-100 shadow-sm transition-all active:scale-95 uppercase tracking-wider">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                                PDF Rekap
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="overflow-x-auto min-h-[400px]">
+                        <table class="w-full text-sm text-left text-gray-500 border-collapse">
+                            <thead class="text-xs text-gray-700 uppercase bg-orange-50/50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 w-10">
+                                        <input type="checkbox" @click="toggleSelectAll()"
+                                            :checked="selectedIds.length === paginatedStudents.length && paginatedStudents.length > 0"
+                                            class="rounded text-orange-500 focus:ring-orange-500">
+                                    </th>
+                                    <th class="px-6 py-3 font-bold">Pendaftar</th>
+                                    <th class="px-6 py-3 font-bold">Identitas</th>
+                                    <th class="px-6 py-3 font-bold">Orang Tua</th>
+                                    <th class="px-6 py-3 font-bold">Status</th>
+                                    <th class="px-6 py-3 font-bold text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="s in paginatedStudents" :key="s.id">
+                                    <tr
+                                        class="bg-white border-b hover:bg-orange-50/30 transition-all cursor-default group">
+                                        <td class="px-4 py-4 uppercase">
+                                            <input type="checkbox" :value="String(s.id)" x-model="selectedIds"
+                                                class="rounded text-orange-500 focus:ring-orange-500">
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex flex-col">
+                                                <span
+                                                    class="font-bold text-gray-900 group-hover:text-orange-600 transition-colors"
+                                                    x-text="s.nama_lengkap"></span>
+                                                <div class="flex items-center gap-2 mt-1">
+                                                    <span
+                                                        class="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-bold"
+                                                        x-text="s.jenis_pendaftaran"></span>
+                                                    <span class="text-[10px] text-gray-400 font-medium"
+                                                        x-text="'Tgl: ' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '-')"></span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex flex-col gap-0.5">
+                                                <div class="text-xs font-bold text-gray-700"
+                                                    x-text="'NIK: ' + (s.nik || '-')"></div>
+                                                <div class="text-[10px] text-gray-500"
+                                                    x-text="'NISN: ' + (s.nisn || '-')"></div>
+                                                <div class="text-[10px] text-orange-500 font-medium"
+                                                    x-text="'WA: ' + (s.no_telepon || '-')"></div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 uppercase">
+                                            <div class="text-gray-700 font-bold text-xs"
+                                                x-text="s.nama_ayah || 'Data Ortu -'"></div>
+                                            <div class="text-[10px] text-gray-400 italic"
+                                                x-text="s.pekerjaan_ayah || 'Tidak bekerja'"></div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <template x-if="s.status === 'pending'">
+                                                <span
+                                                    class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-yellow-200 uppercase">Menunggu</span>
+                                            </template>
+                                            <template x-if="s.status === 'accepted'">
+                                                <span
+                                                    class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-emerald-200 uppercase">Diterima</span>
+                                            </template>
+                                            <template x-if="s.status === 'rejected'">
+                                                <span
+                                                    class="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-rose-200 uppercase">Ditolak</span>
+                                            </template>
+                                        </td>
+                                        <td class="px-6 py-4 text-right space-x-2">
+                                            <button @click="openStudentDetail(s)"
+                                                class="bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-orange-100 shadow-sm">
+                                                DETAIL
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-if="paginatedStudents.length === 0">
+                                    <tr>
+                                        <td colspan="6" class="px-6 py-10 text-center text-gray-400 italic">Belum ada
+                                            data pendaftar.</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div
+                        class="p-4 bg-gray-50 border-t border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div class="flex items-center gap-4 text-xs text-gray-500 font-medium">
+                            <div class="flex items-center gap-2">
+                                <span>Tampilkan:</span>
+                                <select x-model="pageSize" @change="currentPage = 1"
+                                    class="bg-white border border-gray-300 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-orange-500">
+                                    <option value="10">10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="500">500</option>
+                                </select>
+                                <span>baris</span>
+                            </div>
+                            <span
+                                x-text="'Menampilkan ' + (filteredStudents.length > 0 ? ((currentPage-1)*pageSize + 1) : 0) + ' - ' + Math.min(currentPage*pageSize, filteredStudents.length) + ' dari ' + filteredStudents.length + ' data'"></span>
+                        </div>
+
+                        <div class="flex items-center gap-1">
+                            <button @click="currentPage--" :disabled="currentPage === 1"
+                                class="p-2 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <div class="flex gap-1 overflow-x-auto max-w-[200px] px-1">
+                                <template x-for="p in totalPages">
+                                    <button @click="currentPage = p"
+                                        :class="currentPage === p ? 'bg-orange-600 text-white border-orange-600 shadow-md scale-110' : 'bg-white border-gray-300 text-gray-600 hover:border-orange-500 hover:text-orange-500'"
+                                        class="w-8 h-8 flex items-center justify-center border rounded-lg text-xs font-bold transition-all"
+                                        x-text="p">
+                                    </button>
+                                </template>
+                            </div>
+                            <button @click="currentPage++" :disabled="currentPage === totalPages || totalPages === 0"
+                                class="p-2 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Teachers View -->
+            <div x-show="currentTab === 'teachers'" x-cloak>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b border-gray-200 flex justify-between bg-gray-50/50">
+                        <h2 class="font-bold text-gray-800">Manajemen Guru</h2>
+                        <button @click="openAddForm('teacher')"
+                            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm">Tambah
+                            Guru</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 font-medium">Foto</th>
+                                    <th class="px-6 py-3 font-medium">Nama</th>
+                                    <th class="px-6 py-3 font-medium">Jabatan</th>
+                                    <th class="px-6 py-3 font-medium text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="t in teachers" :key="t.id">
+                                    <tr class="bg-white border-b hover:bg-gray-50 transition">
+                                        <td class="px-6 py-4">
+                                            <img :src="t.photo_url || 'https://ui-avatars.com/api/?background=random&name=' + t.name"
+                                                class="h-10 w-10 object-cover rounded-full shadow-sm border-2 border-white">
+                                        </td>
+                                        <td class="px-6 py-4 font-medium text-gray-900" x-text="t.name"></td>
+                                        <td class="px-6 py-4" x-text="t.position"></td>
+                                        <td class="px-6 py-4 text-right flex justify-end gap-2">
+                                            <button
+                                                @click="openDetailModal({ image_url: t.photo_url || 'https://ui-avatars.com/api/?background=random&name=' + t.name, title: t.name, subtitle: t.position, created_at: t.created_at, is_teacher: true })"
+                                                class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-blue-100 shadow-sm uppercase tracking-wider">Lihat</button>
+                                            <button @click="openEditForm('teacher', t)"
+                                                class="bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-amber-100 shadow-sm uppercase tracking-wider">Edit</button>
+                                            <button @click="deleteItem('deleteTeacher', t.id)"
+                                                class="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-rose-100 shadow-sm uppercase tracking-wider">Hapus</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Posts View -->
+            <div x-show="currentTab === 'posts'" x-cloak>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b border-gray-200 flex justify-between bg-gray-50/50">
+                        <h2 class="font-bold text-gray-800">Manajemen Berita & Kegiatan</h2>
+                        <button @click="openAddForm('post')"
+                            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm">Tambah
+                            Berita</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 font-medium">Gambar</th>
+                                    <th class="px-6 py-3 font-medium">Judul</th>
+                                    <th class="px-6 py-3 font-medium">Kategori</th>
+                                    <th class="px-6 py-3 font-medium text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="p in posts" :key="p.id">
+                                    <tr class="bg-white border-b hover:bg-gray-50 transition">
+                                        <td class="px-6 py-4">
+                                            <img :src="p.thumbnail_url"
+                                                class="h-10 w-16 object-cover rounded shadow-sm">
+                                        </td>
+                                        <td class="px-6 py-4 font-medium text-gray-900" x-text="p.title"></td>
+                                        <td class="px-6 py-4 text-xs font-semibold uppercase">
+                                            <span x-show="p.category === 'news'"
+                                                class="bg-orange-100 text-orange-700 border border-orange-200 px-2 py-0.5 rounded">Artikel</span>
+                                            <span x-show="p.category === 'link'"
+                                                class="bg-yellow-100 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded">Ext.
+                                                Link</span>
+                                            <span x-show="p.category !== 'news' && p.category !== 'link'"
+                                                class="bg-gray-100 text-gray-800 border border-gray-200 px-2 py-0.5 rounded"
+                                                x-text="p.category"></span>
+                                        </td>
+                                        <td class="px-6 py-4 text-right flex justify-end gap-2">
+                                            <button x-show="p.category === 'news'"
+                                                @click="prompt('📤 Link share berita (preview di FB/IG/sosmed):', window.location.href.replace(/admin\.html.*$/, 'index.html') + '?post=' + p.id)"
+                                                class="bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-indigo-100 shadow-sm uppercase tracking-wider">Share</button>
+                                            <button @click="openEditForm('post', p)"
+                                                class="bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-amber-100 shadow-sm uppercase tracking-wider">Edit</button>
+                                            <button @click="deleteItem('deletePost', p.id)"
+                                                class="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-rose-100 shadow-sm uppercase tracking-wider">Hapus</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+
+
+
+
+            <!-- Messages View -->
+            <div x-show="currentTab === 'messages'" x-cloak class="h-[calc(100vh-12rem)]">
+                <div
+                    class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col md:flex-row">
+
+                    <!-- Sidebar: Message List -->
+                    <div class="w-full md:w-80 border-r border-gray-200 flex flex-col bg-white">
+                        <div class="p-4 border-b border-gray-100 bg-gray-50/30 flex items-center gap-2">
+                            <input type="text" x-model="msgSearchQuery" placeholder="Cari pengirim..."
+                                class="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 outline-none">
+                            <div class="flex gap-1">
+                                <button @click="markAllAsRead"
+                                    class="p-2 text-gray-400 hover:text-yellow-600 bg-white border border-gray-200 rounded-xl transition shadow-sm"
+                                    title="Tandai semua dibaca">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                    </svg>
+                                </button>
+                                <button @click="deleteAllMessages"
+                                    class="p-2 text-gray-400 hover:text-red-600 bg-white border border-gray-200 rounded-xl transition shadow-sm"
+                                    title="Hapus semua pesan">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex-1 overflow-y-auto divide-y divide-gray-50">
+                            <template x-for="m in filteredMessages" :key="m.id">
+                                <div @click="viewMessage(m)"
+                                    :class="selectedMsg?.id === m.id ? 'bg-yellow-50' : 'hover:bg-gray-50'"
+                                    class="p-4 cursor-pointer transition-all relative group">
+                                    <div class="flex justify-between items-start mb-1">
+                                        <span class="font-bold text-gray-900 truncate pr-4"
+                                            :class="isUnread(m) ? 'text-black' : 'text-gray-600 font-semibold'"
+                                            x-text="m.name"></span>
+                                        <span class="text-[10px] text-gray-400 whitespace-nowrap"
+                                            x-text="new Date(m.created_at).toLocaleDateString()"></span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 truncate" x-text="m.subject"></div>
+                                    <!-- Unread Indicator -->
+                                    <template x-if="isUnread(m)">
+                                        <div
+                                            class="absolute right-4 bottom-4 w-2 h-2 bg-yellow-500 rounded-full shadow-sm">
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="filteredMessages.length === 0">
+                                <div class="p-8 text-center text-gray-400 text-sm">Tidak ada pesan.</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Detail: Message Content -->
+                    <div class="flex-1 bg-gray-50/30 flex flex-col relative overflow-hidden">
+                        <template x-if="selectedMsg">
+                            <div class="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
+                                <!-- Detail Header -->
+                                <div class="p-6 bg-white border-b border-gray-100 flex justify-between items-center">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-700 font-bold text-lg"
+                                            x-text="selectedMsg.name[0]"></div>
+                                        <div>
+                                            <h3 class="font-bold text-gray-900" x-text="selectedMsg.name"></h3>
+                                            <p class="text-xs text-gray-500" x-text="selectedMsg.email"></p>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <a :href="'mailto:' + selectedMsg.email"
+                                            class="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition"
+                                            title="Balas">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                            </svg>
+                                        </a>
+                                        <button @click="deleteItem('deleteMessage', selectedMsg.id)"
+                                            class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                            title="Hapus">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                        <button @click="selectedMsg = null"
+                                            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                                            title="Tutup">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Detail Body -->
+                                <div class="p-8 flex-1 overflow-y-auto space-y-6">
+                                    <div>
+                                        <span
+                                            class="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Subjek</span>
+                                        <h4 class="text-xl font-bold text-gray-900" x-text="selectedMsg.subject"></h4>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm leading-relaxed text-gray-700 whitespace-pre-line"
+                                        x-text="selectedMsg.content"></div>
+                                    <div class="text-[10px] text-gray-400">Diterima pada: <span
+                                            x-text="new Date(selectedMsg.created_at).toLocaleString()"></span></div>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="!selectedMsg">
+                            <div class="flex-1 flex flex-col items-center justify-center text-gray-400 opacity-60">
+                                <svg class="w-20 h-20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                <p class="font-medium text-sm">Pilih pesan untuk membacanya</p>
+                            </div>
+                        </template>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Slider View -->
+            <div x-show="currentTab === 'sliders'" x-cloak>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b border-gray-200 flex justify-between bg-gray-50/50">
+                        <h2 class="font-bold text-gray-800">Manajemen Hero Slider</h2>
+                        <button @click="openAddForm('slider')"
+                            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm">Tambah
+                            Slide</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 font-medium">Gambar</th>
+                                    <th class="px-6 py-3 font-medium text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="s in sliders" :key="s.id">
+                                    <tr class="bg-white border-b hover:bg-gray-50 transition">
+                                        <td class="px-6 py-4">
+                                            <img :src="s.image_url" class="h-12 w-20 object-cover rounded shadow-sm">
+                                        </td>
+                                        <td class="px-6 py-4 text-right flex justify-end gap-2">
+                                            <button @click="openDetailModal(s)"
+                                                class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-blue-100 shadow-sm uppercase tracking-wider">Lihat</button>
+                                            <button @click="openEditForm('slider', s)"
+                                                class="bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-amber-100 shadow-sm uppercase tracking-wider">Edit</button>
+                                            <button @click="deleteItem('deleteSlider', s.id)"
+                                                class="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-rose-100 shadow-sm uppercase tracking-wider">Hapus</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div x-show="currentTab === 'settings'" x-cloak>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-8">
+                    <div>
+                        <h2 class="font-bold text-gray-800 mb-4">Logo Sekolah & Branding</h2>
+                        <div class="grid grid-cols-1 gap-6">
+                            <!-- Logo Utama -->
+                            <div
+                                class="flex flex-col items-center gap-6 p-6 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner">
+                                <div class="relative group">
+                                    <div
+                                        class="w-28 h-28 rounded-2xl overflow-hidden border-2 border-white bg-white shadow-xl relative transition-transform hover:scale-105 duration-300">
+                                        <template x-if="settings.school_logo">
+                                            <img :src="settings.school_logo" class="w-full h-full object-contain p-2">
+                                        </template>
+                                        <template x-if="!settings.school_logo">
+                                            <div
+                                                class="w-full h-full flex flex-col items-center justify-center text-gray-300 bg-gray-50">
+                                                <svg class="w-8 h-8 mb-1" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <span class="text-[8px] font-bold uppercase tracking-tighter">No
+                                                    Logo</span>
+                                            </div>
+                                        </template>
+
+                                        <!-- Uploading Overlay -->
+                                        <div x-show="logoUploading" x-cloak
+                                            class="absolute inset-0 bg-yellow-600/60 backdrop-blur-sm flex flex-col items-center justify-center text-white z-20">
+                                            <svg class="animate-spin h-6 w-6 mb-1" xmlns="http://www.w3.org/2000/svg"
+                                                fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                    stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                </path>
+                                            </svg>
+                                            <span class="text-[9px] font-bold uppercase">Uploading</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex-1 space-y-4">
+                                    <div class="text-center">
+                                        <h3 class="text-sm font-bold text-gray-900 mb-1">Logo Utama Website</h3>
+                                        <p class="text-xs text-gray-500 leading-relaxed">Logo ini akan tampil di navbar
+                                            dan halaman depan website publik.</p>
+                                    </div>
+
+                                    <div class="flex flex-wrap gap-3 justify-center">
+                                        <!-- Aksi Detail -->
+                                        <button
+                                            @click="openDetailModal({ image_url: settings.school_logo, title: 'Pratinjau Logo', subtitle: 'Versi asli yang saat ini digunakan di website.' })"
+                                            :disabled="!settings.school_logo"
+                                            class="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-xl text-xs font-bold hover:bg-orange-100 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            Lihat
+                                        </button>
+
+                                        <!-- Aksi Ganti -->
+                                        <label
+                                            class="cursor-pointer flex items-center gap-2 px-4 py-2 bg-yellow-50 text-yellow-700 rounded-xl text-xs font-bold hover:bg-yellow-100 transition shadow-sm">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                            </svg>
+                                            Ganti Logo
+                                            <input type="file" @change="handleLogoUpload($event)" accept="image/*"
+                                                class="hidden">
+                                        </label>
+
+                                        <!-- Aksi Hapus -->
+                                        <button @click="deleteLogo()" :disabled="!settings.school_logo"
+                                            class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-xl text-xs font-bold hover:bg-red-100 transition disabled:opacity-50">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            Hapus
+                                        </button>
+                                    </div>
+                                    <div x-show="logoUploading"
+                                        class="text-center text-[10px] text-yellow-600 font-bold animate-pulse flex items-center justify-center gap-2 mt-2">
+                                        <div class="w-1.5 h-1.5 bg-yellow-600 rounded-full animate-ping"></div>
+                                        Menghubungkan ke Google Drive...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h2 class="font-bold text-gray-800 mb-4">Pengaturan Web</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <template x-for="(val, key) in settings">
+                                <div class="space-y-1"
+                                    x-show="!['school_logo', 'school_logo_base64', 'admin_logo', 'google_maps_embed', 'school_description', 'hero_subtitle', 'status', 'accreditation', 'npsn', 'curriculum'].includes(key)">
+                                    <label class="text-xs font-bold text-gray-500 uppercase"
+                                        x-text="key.replace(/_/g, ' ')"></label>
+                                    <input type="text" x-model="settings[key]"
+                                        class="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-yellow-500/20 outline-none">
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Identitas Sekolah (Tentang Kami) -->
+                        <div class="mt-6 p-4 rounded-xl bg-orange-50 border border-orange-100">
+                            <h3 class="text-xs font-bold text-orange-600 uppercase tracking-widest mb-3">🏫 Identitas
+                                Sekolah (Tampil di Tentang Kami)</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-gray-500 uppercase">Status</label>
+                                    <input type="text" x-model="settings.status" placeholder="Negeri / Swasta"
+                                        class="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-orange-500/20 outline-none bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-gray-500 uppercase">Akreditasi</label>
+                                    <input type="text" x-model="settings.accreditation" placeholder="A / B / C"
+                                        class="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-orange-500/20 outline-none bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-gray-500 uppercase">NPSN</label>
+                                    <input type="text" x-model="settings.npsn" placeholder="Nomor Pokok Sekolah"
+                                        class="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-orange-500/20 outline-none bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-gray-500 uppercase">Kurikulum</label>
+                                    <input type="text" x-model="settings.curriculum" placeholder="Merdeka / K13"
+                                        class="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-orange-500/20 outline-none bg-white">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">Teks Beranda / Hero
+                                Slider</label>
+                            <textarea x-model="settings.hero_subtitle" rows="2"
+                                placeholder="Tulis tagline sekolah di sini..."
+                                class="w-full p-3 border rounded text-sm focus:ring-2 focus:ring-yellow-500/20 outline-none"></textarea>
+                            <p class="text-[10px] text-orange-500 font-medium">💡 Format didukung: <code
+                                    class="bg-orange-50 px-1 rounded">**bold**</code> &nbsp;
+                                <code class="bg-orange-50 px-1 rounded">_italic_</code>
+                            </p>
+                        </div>
+                        <div class="mt-4 space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">Deskripsi / Komitmen Sekolah
+                                (Tentang Kami)</label>
+                            <textarea x-model="settings.school_description" rows="4"
+                                placeholder="Tulis komitmen sekolah di sini..."
+                                class="w-full p-3 border rounded text-sm focus:ring-2 focus:ring-yellow-500/20 outline-none"></textarea>
+                            <p class="text-[10px] text-orange-500 font-medium">💡 Format didukung: <code
+                                    class="bg-orange-50 px-1 rounded">### judul</code> &nbsp; <code
+                                    class="bg-orange-50 px-1 rounded">**bold**</code> &nbsp; <code
+                                    class="bg-orange-50 px-1 rounded">_italic_</code></p>
+                        </div>
+                        <div class="mt-4 space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">Kode Embed Google Maps
+                                (iframe)</label>
+                            <textarea x-model="settings.google_maps_embed" rows="3"
+                                placeholder="Paste <iframe ...> di sini"
+                                class="w-full p-3 border rounded text-xs font-mono focus:ring-2 focus:ring-yellow-500/20 outline-none"></textarea>
+                            <p class="text-[10px] text-gray-400">Dapatkan kode dari Google Maps -> Bagikan ->
+                                Sematkan peta</p>
+                        </div>
+
+                        <!-- URL Website Production (untuk share link berita ke WA) -->
+                        <div class="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-100">
+                            <h3 class="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">🔗 URL Website
+                                Production</h3>
+                            <p class="text-[11px] text-blue-500 mb-3">Digunakan untuk generate link berita yang bisa
+                                dibagikan ke WhatsApp dengan preview gambar.</p>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-500 uppercase">URL Website</label>
+                                <input type="url" x-model="settings.site_url"
+                                    placeholder="Contoh: https://sdnmekarsari.github.io/frontend"
+                                    class="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
+                                <p class="text-[10px] text-gray-400">Kosongkan jika belum punya domain. Link WA tetap
+                                    bisa digunakan via GAS.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button @click="modalType='settings'; formData=settings; saveForm()"
+                            class="bg-yellow-600 hover:bg-yellow-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-yellow-600/20 transition-all flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Simpan Semua Pengaturan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal Form (Filament-like Modal) -->
+    <div x-show="showModal" x-cloak
+        class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+        <div
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-200 animate-in fade-in zoom-in duration-200">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 class="text-lg font-bold text-gray-900" x-text="modalTitle"></h3>
+                <button @click="showModal = false" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                <!-- Teacher Form -->
+                <template x-if="modalType === 'teacher'">
+                    <div class="space-y-4 text-sm">
+                        <!-- Pratinjau Foto -->
+                        <div x-show="formData.id || formData.photo"
+                            class="p-3 bg-orange-50 border border-orange-100 rounded-lg flex items-center gap-4">
+                            <img :src="formData.photo || formData.photo_url || 'https://ui-avatars.com/api/?background=random&name=' + (formData.name || 'Guru')"
+                                class="h-16 w-16 object-cover rounded-full shadow-sm border-2 border-white">
+                            <div>
+                                <p class="text-xs text-orange-600 font-bold uppercase tracking-wider">Pratinjau Foto</p>
+                                <p class="text-[10px] text-gray-400">Pilih file baru untuk mengganti</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                            <input type="text" x-model="formData.name" placeholder="Contoh: Budi Santoso, S.Pd"
+                                class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-yellow-500/20">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Jabatan / Role</label>
+                            <input type="text" x-model="formData.position" placeholder="Contoh: Guru Kelas 1A"
+                                class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-yellow-500/20">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Bio / Deskripsi Singkat</label>
+                            <div
+                                class="border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-yellow-500/20">
+                                <div class="flex gap-1 p-1.5 bg-gray-50 border-b">
+                                    <button type="button" title="Tebal"
+                                        @click="insertFormat($el.closest('.border.rounded-lg').querySelector('textarea'), '**', '**')"
+                                        class="px-2 py-1 text-sm font-bold text-gray-700 hover:bg-gray-200 rounded transition">B</button>
+                                    <button type="button" title="Miring"
+                                        @click="insertFormat($el.closest('.border.rounded-lg').querySelector('textarea'), '_', '_')"
+                                        class="px-2 py-1 text-sm italic text-gray-700 hover:bg-gray-200 rounded transition">I</button>
+                                </div>
+                                <textarea x-model="formData.bio" rows="3" id="teacher-bio-textarea"
+                                    class="w-full p-2 outline-none bg-white resize-y"
+                                    placeholder="Tuliskan pengalaman atau moto guru..."></textarea>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Pilih Foto Profil</label>
+                            <input type="file"
+                                @change="const file = $event.target.files[0]; const reader = new FileReader(); reader.onload = (e) => { formData.photo = e.target.result; formData.photoName = file.name; }; reader.readAsDataURL(file);"
+                                accept="image/*" class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Urutan Tampilan</label>
+                            <input type="number" x-model="formData.sort_order"
+                                class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-yellow-500/20">
+                        </div>
+                    </div>
+                </template>
+                <!-- Post Form -->
+                <template x-if="modalType === 'post'">
+                    <div class="space-y-4 text-sm">
+                        <div x-show="formData.id || formData.thumbnailBase64"
+                            class="p-3 bg-orange-50 border border-orange-100 rounded-lg">
+                            <p class="text-xs text-orange-600 font-medium mb-1">Pratinjau Thumbnail:</p>
+                            <img :src="formData.thumbnailBase64 || formData.thumbnail_url"
+                                class="h-16 w-32 object-cover rounded shadow-sm border border-white">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Judul Posting</label>
+                            <input type="text" x-model="formData.title"
+                                class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-yellow-500/20">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Pilih Kategori Pos</label>
+                            <select x-model="formData.category"
+                                class="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-yellow-500/20">
+                                <option value="news">Berita / Artikel Sekolah</option>
+                                <option value="link">Tautan Eksternal (Socmed / YT)</option>
+                            </select>
+                        </div>
+                        <div x-show="formData.category === 'news'">
+                            <label class="block font-medium text-gray-700 mb-1">Isi Berita / Artikel</label>
+                            <div
+                                class="border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-yellow-500/20">
+                                <div class="flex flex-wrap gap-1 p-1.5 bg-gray-50 border-b">
+                                    <button type="button" title="Tebal"
+                                        @click="insertFormat($el.closest('.border.rounded-lg').querySelector('textarea'), '**', '**')"
+                                        class="px-2 py-1 text-sm font-bold text-gray-700 hover:bg-gray-200 rounded transition">B</button>
+                                    <button type="button" title="Miring"
+                                        @click="insertFormat($el.closest('.border.rounded-lg').querySelector('textarea'), '_', '_')"
+                                        class="px-2 py-1 text-sm italic text-gray-700 hover:bg-gray-200 rounded transition">I</button>
+                                    <button type="button" title="Judul / Heading"
+                                        @click="insertHeading($el.closest('.border.rounded-lg').querySelector('textarea'))"
+                                        class="px-2 py-1 text-sm font-bold text-gray-700 hover:bg-gray-200 rounded transition">H</button>
+                                    <div class="w-px bg-gray-300 mx-0.5"></div>
+                                    <button type="button" title="Sisipkan Link"
+                                        @click="insertLink($el.closest('.border.rounded-lg').querySelector('textarea'))"
+                                        class="px-2 py-1 text-sm text-gray-700 hover:bg-gray-200 rounded transition flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                        </svg>
+                                        Link
+                                    </button>
+                                </div>
+                                <textarea x-model="formData.content" rows="6" id="post-content-textarea"
+                                    class="w-full p-2 outline-none bg-white resize-y"
+                                    placeholder="Tuliskan isi artikel Anda di sini..."></textarea>
+                            </div>
+                        </div>
+                        <div x-show="formData.category === 'link'">
+                            <label class="block font-medium text-gray-700 mb-1">Link URL (Tujuan)</label>
+                            <input type="url" x-model="formData.video_url" placeholder="https://youtube.com/..."
+                                class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-yellow-500/20 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Tanggal Posting (Opsional)</label>
+                            <input type="datetime-local"
+                                :value="formData.created_at ? formData.created_at.slice(0, 16) : ''"
+                                @input="formData.created_at = $event.target.value"
+                                class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-yellow-500/20">
+                            <p class="text-xs text-gray-500 mt-1">Kosongkan untuk otomatis menggunakan tanggal waktu
+                                saat ini.</p>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">Upload Thumbnail</label>
+                            <input type="file"
+                                @change="const file = $event.target.files[0]; const reader = new FileReader(); reader.onload = (e) => { formData.thumbnailBase64 = e.target.result; formData.thumbnailName = file.name; }; reader.readAsDataURL(file);"
+                                accept="image/*" class="w-full p-2 border rounded-lg">
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Stat Form -->
+
+                <!-- Slider Form -->
+                <template x-if="modalType === 'slider'">
+                    <div class="space-y-4 text-sm">
+                        <div x-show="formData.id" class="p-3 bg-orange-50 border border-orange-100 rounded-lg">
+                            <p class="text-xs text-orange-600 font-medium mb-1">Gambar Saat Ini:</p>
+                            <img :src="formData.image_url"
+                                class="h-24 w-full object-cover rounded shadow-sm border border-white">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1"
+                                x-text="formData.id ? 'Ganti Foto (Kosongkan jika tidak ingin mengubah)' : 'Pilih Foto Background'"></label>
+                            <input type="file"
+                                @change="const file = $event.target.files[0]; const reader = new FileReader(); reader.onload = (e) => { formData.image = e.target.result; }; reader.readAsDataURL(file);"
+                                accept="image/*" class="w-full p-2 border rounded-lg">
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Admin Profile Form -->
+                <template x-if="modalType === 'admin_profile'">
+                    <div class="space-y-5 text-sm">
+                        <div class="flex flex-col items-center gap-4 py-4">
+                            <div class="relative group">
+                                <div
+                                    class="w-24 h-24 rounded-full bg-orange-600 text-white flex items-center justify-center text-3xl font-black shadow-xl border-4 border-white overflow-hidden">
+                                    <template x-if="formData.admin_photo">
+                                        <img :src="formData.admin_photo" class="w-full h-full object-cover">
+                                    </template>
+                                    <template x-if="!formData.admin_photo">
+                                        <span x-text="(formData.admin_name || 'A')[0].toUpperCase()"></span>
+                                    </template>
+                                </div>
+                                <label
+                                    class="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 group-hover:opacity-100 rounded-full cursor-pointer transition-all">
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <input type="file" class="hidden" accept="image/*"
+                                        @change="const file = $event.target.files[0]; const reader = new FileReader(); reader.onload = (e) => { formData.admin_photo_base64 = e.target.result; formData.admin_photo = e.target.result; }; reader.readAsDataURL(file);">
+                                </label>
+                            </div>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Klik foto untuk
+                                mengubah</p>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Panggilan /
+                                    Nama Lengkap</label>
+                                <input type="text" x-model="formData.admin_name" placeholder="Contoh: Admin SD"
+                                    class="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-semibold text-gray-800">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Peran /
+                                    Jabatan</label>
+                                <input type="text" x-model="formData.admin_role" placeholder="Contoh: Operator IT"
+                                    class="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all font-semibold text-gray-800">
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                <button @click="showModal = false"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg">Batal</button>
+                <button @click="saveForm()"
+                    class="px-4 py-2 text-sm font-bold text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg shadow-sm">Simpan</button>
+            </div>
+        </div>
+    </div>
+    </main>
+
+    <!-- Student Detail Modal (CRUD & Export) -->
+    <div x-show="showStudentDetailModal" x-cloak
+        class="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
+        <div
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-8 overflow-hidden border border-gray-200 animate-in fade-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+            <!-- Header -->
+            <div
+                class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-orange-500 text-white shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-white/20 rounded-lg">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold leading-tight" x-text="activeStudent?.nama_lengkap"></h3>
+                        <p class="text-xs text-orange-100 opacity-80" x-text="'ID: ' + activeStudent?.id"></p>
+                    </div>
+                </div>
+                <button @click="showStudentDetailModal = false"
+                    class="text-white/70 hover:text-white transition-colors text-3xl font-light">&times;</button>
+            </div>
+
+            <!-- Body (Scrollable) -->
+            <div class="p-6 overflow-y-auto space-y-8 bg-gray-50/30">
+                <template x-if="activeStudent">
+                    <div class="space-y-8">
+                        <!-- Quick Actions & Status -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status
+                                    Pendaftaran</label>
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <template x-if="activeStudent.status === 'pending'">
+                                            <span class="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></span>
+                                        </template>
+                                        <template x-if="activeStudent.status === 'accepted'">
+                                            <span class="w-3 h-3 bg-emerald-500 rounded-full"></span>
+                                        </template>
+                                        <template x-if="activeStudent.status === 'rejected'">
+                                            <span class="w-3 h-3 bg-rose-500 rounded-full"></span>
+                                        </template>
+                                        <span class="text-sm font-bold uppercase text-gray-700"
+                                            x-text="activeStudent.status"></span>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button
+                                            @click="updateStudentStatus(activeStudent.id, 'accepted'); activeStudent.status = 'accepted'"
+                                            class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-all">TERIMA</button>
+                                        <button
+                                            @click="updateStudentStatus(activeStudent.id, 'rejected'); activeStudent.status = 'rejected'"
+                                            class="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg text-xs font-bold transition-all">TOLAK</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ekspor &
+                                    Cetak</label>
+                                <div class="flex flex-col gap-2">
+                                    <button @click="exportSingleToPDF(activeStudent)"
+                                        class="flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white py-2 rounded-lg text-xs font-bold transition-all shadow-md">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                        </svg>
+                                        DOWNLOAD PDF
+                                    </button>
+                                    <button
+                                        @click="const ws = XLSX.utils.json_to_sheet([activeStudent]); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pendaftar'); XLSX.writeFile(wb, `Data_${activeStudent.nama_lengkap}.xlsx`)"
+                                        class="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white py-2 rounded-lg text-xs font-bold transition-all shadow-md">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        DOWNLOAD EXCEL
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Aksi
+                                    Bahaya</label>
+                                <div class="flex flex-col gap-2">
+                                    <button @click="deleteStudent(activeStudent.id)"
+                                        class="flex items-center justify-center gap-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 py-2 rounded-lg text-xs font-bold transition-all">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        HAPUS PERMANEN
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 1. Data Registrasi -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div class="px-5 py-3 bg-orange-50/50 border-b border-gray-100 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2.5 2.5 0 00-2.5-2.5H15M9 11l3 3m0 0l3-3m-3 3V8" />
+                                </svg>
+                                <h4 class="text-xs font-bold text-blue-700 uppercase tracking-widest">Bagian 1: Data
+                                    Registrasi</h4>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">Jenis Pendaftaran /
+                                        Kelas</label>
+                                    <div class="flex gap-2">
+                                        <select x-model="activeStudent.jenis_pendaftaran"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            <option value="Siswa Baru">Siswa Baru</option>
+                                            <option value="Pindahan">Pindahan</option>
+                                        </select>
+                                        <select x-show="activeStudent.jenis_pendaftaran === 'Pindahan'"
+                                            x-model="activeStudent.kelas"
+                                            class="w-1/2 text-sm font-semibold text-amber-700 border-b border-transparent focus:border-amber-500 outline-none p-1 bg-amber-50 rounded">
+                                            <option value="">Pilih Rombel</option>
+                                            <option>Kelas 2</option>
+                                            <option>Kelas 3</option>
+                                            <option>Kelas 4</option>
+                                            <option>Kelas 5</option>
+                                            <option>Kelas 6</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">Hobi /
+                                        Cita-Cita</label>
+                                    <div class="flex gap-2">
+                                        <input type="text" x-model="activeStudent.hobi" placeholder="Hobi"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                        <input type="text" x-model="activeStudent.cita_cita" placeholder="Cita-cita"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Identitas Diri -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div class="px-5 py-3 bg-orange-50/50 border-b border-gray-100 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 012-2h2a2 2 0 012 2v1m-4 0h4" />
+                                </svg>
+                                <h4 class="text-xs font-bold text-blue-700 uppercase tracking-widest">Bagian 2:
+                                    Identitas Calon Peserta Didik</h4>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">Nama Lengkap (Sesuai
+                                        Akta)</label>
+                                    <input type="text" x-model="activeStudent.nama_lengkap"
+                                        class="w-full text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">NIK / NISN</label>
+                                    <div class="flex gap-2">
+                                        <input type="text" x-model="activeStudent.nik" placeholder="NIK (16 Digit)"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                        <input type="text" x-model="activeStudent.nisn" placeholder="NISN (10 Digit)"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">No. Telepon /
+                                        WhatsApp</label>
+                                    <input type="text" x-model="activeStudent.no_telepon"
+                                        placeholder="Contoh: 081234..."
+                                        class="w-full text-sm font-semibold text-orange-500 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded font-mono">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">Tempat / Tanggal
+                                        Lahir</label>
+                                    <div class="flex gap-2">
+                                        <input type="text" x-model="activeStudent.tempat_lahir"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                        <input type="date" x-model="activeStudent.tanggal_lahir"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">No. Registrasi Akta
+                                        Kelahiran</label>
+                                    <input type="text" x-model="activeStudent.no_akta"
+                                        class="w-full text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">Jenis Kelamin /
+                                        Agama</label>
+                                    <div class="flex gap-2">
+                                        <select x-model="activeStudent.jenis_kelamin"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            <option value="Laki-laki">Laki-laki</option>
+                                            <option value="Perempuan">Perempuan</option>
+                                        </select>
+                                        <input type="text" x-model="activeStudent.agama"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">Alamat Tinggal
+                                        Lengkap</label>
+                                    <textarea x-model="activeStudent.alamat" rows="2"
+                                        class="w-full text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded resize-none"></textarea>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] text-gray-400 font-bold uppercase">Tempat Tinggal /
+                                        Transportasi</label>
+                                    <div class="flex gap-2">
+                                        <select x-model="activeStudent.tempat_tinggal"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            <option value="Bersama Orang Tua">Bersama Orang Tua</option>
+                                            <option value="Wali">Wali</option>
+                                            <option value="Kos / Lainnya">Kos / Lainnya</option>
+                                        </select>
+                                        <select x-model="activeStudent.transportasi"
+                                            class="w-1/2 text-sm font-semibold text-gray-900 border-b border-transparent focus:border-orange-500 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            <option value="Jalan Kaki">Jalan Kaki</option>
+                                            <option value="Antar Jemput Motor">Antar Jemput Motor</option>
+                                            <option value="Antar Jemput Mobil">Antar Jemput Mobil</option>
+                                            <option value="Kendaraan Umum">Kendaraan Umum</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Orang Tua -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div class="px-5 py-3 bg-orange-50/50 border-b border-gray-100 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <h4 class="text-xs font-bold text-blue-700 uppercase tracking-widest">Bagian 3: Data
+                                    Orang Tua / Wali</h4>
+                            </div>
+                            <div class="p-5 flex flex-col gap-8">
+                                <!-- Ayah -->
+                                <div class="space-y-4">
+                                    <div class="flex items-center gap-2 text-orange-600">
+                                        <div class="w-2 h-2 bg-orange-600 rounded-full"></div>
+                                        <span class="text-[10px] font-black uppercase tracking-widest">Ayah
+                                            Kandung</span>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div class="space-y-1">
+                                            <label class="text-[10px] text-gray-400 font-bold uppercase">Nama Lengkap &
+                                                NIK</label>
+                                            <input type="text" x-model="activeStudent.nama_ayah" placeholder="Nama Ayah"
+                                                class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            <input type="text" x-model="activeStudent.nik_ayah" placeholder="NIK Ayah"
+                                                class="w-full text-[10px] font-mono border-b border-gray-50 outline-none p-1 mt-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label class="text-[10px] text-gray-400 font-bold uppercase">Thn Lahir &
+                                                Pendidikan</label>
+                                            <div class="flex gap-2">
+                                                <input type="number" x-model="activeStudent.tahun_lahir_ayah"
+                                                    placeholder="Lahir"
+                                                    class="w-1/3 text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                                <input type="text" x-model="activeStudent.pendidikan_ayah"
+                                                    placeholder="Pendidikan"
+                                                    class="w-2/3 text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            </div>
+                                            <input type="text" x-model="activeStudent.pekerjaan_ayah"
+                                                placeholder="Pekerjaan"
+                                                class="w-full text-xs border-b border-gray-50 outline-none p-1 mt-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label
+                                                class="text-[10px] text-gray-400 font-bold uppercase">Penghasilan</label>
+                                            <input type="text" x-model="activeStudent.penghasilan_ayah"
+                                                class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Ibu -->
+                                <div class="space-y-4 pt-4 border-t border-gray-50">
+                                    <div class="flex items-center gap-2 text-pink-700">
+                                        <div class="w-2 h-2 bg-pink-700 rounded-full"></div>
+                                        <span class="text-[10px] font-black uppercase tracking-widest">Ibu
+                                            Kandung</span>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div class="space-y-1">
+                                            <label class="text-[10px] text-gray-400 font-bold uppercase">Nama Lengkap &
+                                                NIK</label>
+                                            <input type="text" x-model="activeStudent.nama_ibu" placeholder="Nama Ibu"
+                                                class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            <input type="text" x-model="activeStudent.nik_ibu" placeholder="NIK Ibu"
+                                                class="w-full text-[10px] font-mono border-b border-gray-50 outline-none p-1 mt-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label class="text-[10px] text-gray-400 font-bold uppercase">Thn Lahir &
+                                                Pendidikan</label>
+                                            <div class="flex gap-2">
+                                                <input type="number" x-model="activeStudent.tahun_lahir_ibu"
+                                                    placeholder="Lahir"
+                                                    class="w-1/3 text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                                <input type="text" x-model="activeStudent.pendidikan_ibu"
+                                                    placeholder="Pendidikan"
+                                                    class="w-2/3 text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            </div>
+                                            <input type="text" x-model="activeStudent.pekerjaan_ibu"
+                                                placeholder="Pekerjaan"
+                                                class="w-full text-xs border-b border-gray-50 outline-none p-1 mt-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label
+                                                class="text-[10px] text-gray-400 font-bold uppercase">Penghasilan</label>
+                                            <input type="text" x-model="activeStudent.penghasilan_ibu"
+                                                class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Wali -->
+                                <div class="space-y-4 pt-4 border-t border-gray-50">
+                                    <div class="flex items-center gap-2 text-amber-700">
+                                        <div class="w-2 h-2 bg-amber-700 rounded-full"></div>
+                                        <span class="text-[10px] font-black uppercase tracking-widest">Wali
+                                            (Opsional)</span>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div class="space-y-1">
+                                            <label class="text-[10px] text-gray-400 font-bold uppercase">Nama Lengkap &
+                                                NIK</label>
+                                            <input type="text" x-model="activeStudent.nama_wali" placeholder="Nama Wali"
+                                                class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            <input type="text" x-model="activeStudent.nik_wali" placeholder="NIK Wali"
+                                                class="w-full text-[10px] font-mono border-b border-gray-50 outline-none p-1 mt-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label class="text-[10px] text-gray-400 font-bold uppercase">Thn Lahir &
+                                                Pendidikan</label>
+                                            <div class="flex gap-2">
+                                                <input type="number" x-model="activeStudent.tahun_lahir_wali"
+                                                    placeholder="Lahir"
+                                                    class="w-1/3 text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                                <input type="text" x-model="activeStudent.pendidikan_wali"
+                                                    placeholder="Pendidikan"
+                                                    class="w-2/3 text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                            </div>
+                                            <input type="text" x-model="activeStudent.pekerjaan_wali"
+                                                placeholder="Pekerjaan"
+                                                class="w-full text-xs border-b border-gray-50 outline-none p-1 mt-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label
+                                                class="text-[10px] text-gray-400 font-bold uppercase">Penghasilan</label>
+                                            <input type="text" x-model="activeStudent.penghasilan_wali"
+                                                class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. Periodik & Sekolah Asal -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div class="px-5 py-3 bg-orange-50/50 border-b border-gray-100 flex items-center gap-2">
+                                    <h4 class="text-xs font-bold text-blue-700 uppercase tracking-widest">Bagian 4: Data
+                                        Periodik</h4>
+                                </div>
+                                <div class="p-5 grid grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] text-gray-400 font-bold uppercase">Tinggi Badan
+                                            (cm)</label>
+                                        <input type="number" x-model="activeStudent.tinggi_badan"
+                                            class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] text-gray-400 font-bold uppercase">Berat Badan
+                                            (kg)</label>
+                                        <input type="number" x-model="activeStudent.berat_badan"
+                                            class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] text-gray-400 font-bold uppercase">Jarak ke
+                                            Sekolah</label>
+                                        <input type="text" x-model="activeStudent.jarak_sekolah"
+                                            class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] text-gray-400 font-bold uppercase">Jml Saudara
+                                            Kandung</label>
+                                        <input type="number" x-model="activeStudent.jumlah_saudara"
+                                            class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div class="px-5 py-3 bg-orange-50/50 border-b border-gray-100 flex items-center gap-2">
+                                    <h4 class="text-xs font-bold text-blue-700 uppercase tracking-widest">Bagian 5:
+                                        Riwayat Pendidikan</h4>
+                                </div>
+                                <div class="p-5 space-y-4">
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] text-gray-400 font-bold uppercase">Asal Sekolah
+                                            (TK/PAUD)</label>
+                                        <input type="text" x-model="activeStudent.asal_sekolah"
+                                            class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] text-gray-400 font-bold uppercase">NPSN Sekolah
+                                            Asal</label>
+                                        <input type="text" x-model="activeStudent.npsn_asal"
+                                            class="w-full text-sm font-semibold border-b border-gray-100 outline-none p-1 bg-transparent hover:bg-gray-50 rounded">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 5. Berkas Digital -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div class="px-5 py-3 bg-orange-50/50 border-b border-gray-100 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <h4 class="text-xs font-bold text-blue-700 uppercase tracking-widest">Bagian 6: Berkas
+                                    Digital</h4>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <template x-if="activeStudent.file_akta">
+                                    <a :href="activeStudent.file_akta" target="_blank"
+                                        class="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-orange-50 transition-all border border-gray-100 group">
+                                        <div class="flex items-center gap-3">
+                                            <div
+                                                class="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-orange-500 shadow-sm border border-gray-100">
+                                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs font-bold text-gray-800">Akta Kelahiran</p>
+                                                <p class="text-[10px] text-gray-400">Klik untuk melihat file</p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </template>
+                                <template x-if="activeStudent.file_kk">
+                                    <a :href="activeStudent.file_kk" target="_blank"
+                                        class="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-orange-50 transition-all border border-gray-100 group">
+                                        <div class="flex items-center gap-3">
+                                            <div
+                                                class="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-orange-500 shadow-sm border border-gray-100">
+                                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs font-bold text-gray-800">Kartu Keluarga (KK)</p>
+                                                <p class="text-[10px] text-gray-400">Klik untuk melihat file</p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </template>
+                                <template x-if="activeStudent.file_kip">
+                                    <a :href="activeStudent.file_kip" target="_blank"
+                                        class="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-orange-50 transition-all border border-gray-100 group">
+                                        <div class="flex items-center gap-3">
+                                            <div
+                                                class="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-amber-600 shadow-sm border border-gray-100">
+                                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs font-bold text-gray-800">Kartu KIP/PKH</p>
+                                                <p class="text-[10px] text-gray-400">Klik untuk melihat file</p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </template>
+
+                            </div>
+                </template>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 shrink-0 flex justify-between items-center">
+                <p class="text-[10px] text-gray-400 italic">Terakhir diperbarui: <span
+                        x-text="new Date(activeStudent?.created_at).toLocaleString()"></span></p>
+                <div class="flex gap-3">
+                    <button @click="showStudentDetailModal = false"
+                        class="px-6 py-2 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-all">TUTUP</button>
+                    <button @click="updateStudent()"
+                        class="px-8 py-2 text-sm font-black text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-lg shadow-blue-700/20 transition-all active:scale-95">SIMPAN
+                        PERUBAHAN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
