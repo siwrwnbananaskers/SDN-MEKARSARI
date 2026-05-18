@@ -235,6 +235,7 @@ document.addEventListener('alpine:init', () => {
 
         async refreshAll() {
             if (!this.isLoggedIn) return;
+            this.loading = true;
             try {
                 const res = await fetch(`${GAS_URL}?action=getDashboardData&t=${Date.now()}`);
                 const json = await res.json();
@@ -254,6 +255,7 @@ document.addEventListener('alpine:init', () => {
                     this.sliders = (d.sliders || []).map(s => ({ ...s, image_url: this.fixUrl(s.image_url) }));
                 }
             } catch (err) { console.error('Gagal mengambil data dashboard'); }
+            finally { this.loading = false; }
         },
 
         async pollMessages() {
@@ -602,96 +604,147 @@ document.addEventListener('alpine:init', () => {
             doc.setFontSize(10);
             doc.setTextColor(100);
             doc.setFont("times", "normal");
-            doc.text("BUKU INDUK / BIODATA REGISTER PENDAFTAR SISWA", 105, 21, { align: "center" });
+            doc.text("FORMULIR PENDAFTARAN PESERTA DIDIK BARU", 105, 21, { align: "center" });
             doc.line(20, 25, 190, 25);
 
             // Student Identity Header
             doc.setFontSize(14);
             doc.setTextColor(0);
             doc.setFont("times", "bold");
-            doc.text(s.nama_lengkap.toUpperCase(), 20, 35);
+            doc.text((s.nama_lengkap || '-').toUpperCase(), 20, 35);
             doc.setFontSize(9);
             doc.setFont("times", "normal");
             doc.setTextColor(100);
-            doc.text(`ID Pendaftar: ${s.id} | Status: ${s.status.toUpperCase()}`, 20, 40);
+            const statusText = (s.status || 'pending').toUpperCase();
+            const createdDate = s.created_at ? new Date(s.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
+            doc.text(`ID: ${s.id || '-'} | Status: ${statusText} | Tgl Daftar: ${createdDate}`, 20, 40);
             
-            // Prepare Data Sections
-            const formatVal = (v, k) => {
-                if (!v || v === '-') return "-";
-                if (k === 'tanggal_lahir' || k === 'created_at') {
+            // Format helper
+            const fv = (v, type) => {
+                if (v === undefined || v === null || v === '' || v === '-') return "-";
+                if (type === 'date') {
                     const d = new Date(v);
-                    return isNaN(d.getTime()) ? v : d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+                    return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
                 }
                 return String(v);
             };
 
             const sections = [
                 {
-                    title: "I. REGISTRASI & IDENTITAS",
+                    title: "I. DATA REGISTRASI",
                     data: [
-                        ["Jenis Pendaftaran", formatVal(s.jenis_pendaftaran)],
-                        ["NISN", formatVal(s.nisn)],
-                        ["NIK", formatVal(s.nik)],
-                        ["No. Telepon/WA", formatVal(s.no_telepon)],
-                        ["Tempat, Tgl Lahir", `${formatVal(s.tempat_lahir)}, ${formatVal(s.tanggal_lahir, 'tanggal_lahir')}`],
-                        ["Jenis Kelamin", formatVal(s.jenis_kelamin)],
-                        ["Agama", formatVal(s.agama)],
-                        ["Hobi / Cita-cita", `${formatVal(s.hobi)} / ${formatVal(s.cita_cita)}`]
+                        ["Jenis Pendaftaran", fv(s.jenis_pendaftaran)],
+                        ["Kelas Tujuan", s.jenis_pendaftaran === 'Pindahan' ? fv(s.kelas) : "Kelas 1 (Siswa Baru)"],
+                        ["Hobi", fv(s.hobi)],
+                        ["Cita-Cita", fv(s.cita_cita)]
                     ]
                 },
                 {
-                    title: "II. ALAMAT & TEMPAT TINGGAL",
+                    title: "II. IDENTITAS CALON PESERTA DIDIK",
                     data: [
-                        ["Alamat Lengkap", formatVal(s.alamat)],
-                        ["Tempat Tinggal", formatVal(s.tempat_tinggal)],
-                        ["Moda Transportasi", formatVal(s.transportasi)],
-                        ["Jarak ke Sekolah", formatVal(s.jarak_sekolah)]
+                        ["Nama Lengkap (Sesuai Akta)", fv(s.nama_lengkap)],
+                        ["NIK (16 Digit)", fv(s.nik)],
+                        ["NISN (10 Digit)", fv(s.nisn)],
+                        ["No. Telepon / WhatsApp", fv(s.no_telepon)],
+                        ["Tempat Lahir", fv(s.tempat_lahir)],
+                        ["Tanggal Lahir", fv(s.tanggal_lahir, 'date')],
+                        ["No. Registrasi Akta Kelahiran", fv(s.no_akta)],
+                        ["Jenis Kelamin", fv(s.jenis_kelamin)],
+                        ["Agama", fv(s.agama)],
+                        ["Alamat Tinggal Lengkap", fv(s.alamat)],
+                        ["Tempat Tinggal", fv(s.tempat_tinggal)],
+                        ["Moda Transportasi", fv(s.transportasi)]
                     ]
                 },
                 {
-                    title: "III. DATA ORANG TUA / WALI",
+                    title: "III. DATA AYAH KANDUNG",
                     data: [
-                        ["Nama Ayah", formatVal(s.nama_ayah)],
-                        ["Pekerjaan Ayah", formatVal(s.pekerjaan_ayah)],
-                        ["Nama Ibu", formatVal(s.nama_ibu)],
-                        ["Pekerjaan Ibu", formatVal(s.pekerjaan_ibu)],
-                        ["Nama Wali", formatVal(s.nama_wali) === '-' ? "Tidak Ada Wali" : formatVal(s.nama_wali)]
+                        ["Nama Lengkap Ayah", fv(s.nama_ayah)],
+                        ["NIK Ayah", fv(s.nik_ayah)],
+                        ["Tahun Lahir Ayah", fv(s.tahun_lahir_ayah)],
+                        ["Pendidikan Terakhir Ayah", fv(s.pendidikan_ayah)],
+                        ["Pekerjaan Ayah", fv(s.pekerjaan_ayah)],
+                        ["Penghasilan Ayah", fv(s.penghasilan_ayah)]
                     ]
                 },
                 {
-                    title: "IV. DATA PERIODIK & ASAL SEKOLAH",
+                    title: "IV. DATA IBU KANDUNG",
                     data: [
-                        ["Tinggi / Berat", `${formatVal(s.tinggi_badan)} cm / ${formatVal(s.berat_badan)} kg`],
-                        ["Jumlah Saudara", formatVal(s.jumlah_saudara)],
-                        ["Asal Sekolah", formatVal(s.asal_sekolah)],
-                        ["NPSN Asal", formatVal(s.npsn_asal)],
-                        ["Kelas Tujuan", s.jenis_pendaftaran === 'Pindahan' ? formatVal(s.kelas) : "Siswa Baru (Kelas 1)"]
+                        ["Nama Lengkap Ibu", fv(s.nama_ibu)],
+                        ["NIK Ibu", fv(s.nik_ibu)],
+                        ["Tahun Lahir Ibu", fv(s.tahun_lahir_ibu)],
+                        ["Pendidikan Terakhir Ibu", fv(s.pendidikan_ibu)],
+                        ["Pekerjaan Ibu", fv(s.pekerjaan_ibu)],
+                        ["Penghasilan Ibu", fv(s.penghasilan_ibu)]
+                    ]
+                },
+                {
+                    title: "V. DATA WALI (OPSIONAL)",
+                    data: [
+                        ["Nama Lengkap Wali", fv(s.nama_wali)],
+                        ["NIK Wali", fv(s.nik_wali)],
+                        ["Tahun Lahir Wali", fv(s.tahun_lahir_wali)],
+                        ["Pendidikan Terakhir Wali", fv(s.pendidikan_wali)],
+                        ["Pekerjaan Wali", fv(s.pekerjaan_wali)],
+                        ["Penghasilan Wali", fv(s.penghasilan_wali)]
+                    ]
+                },
+                {
+                    title: "VI. DATA PERIODIK",
+                    data: [
+                        ["Tinggi Badan (cm)", fv(s.tinggi_badan)],
+                        ["Berat Badan (kg)", fv(s.berat_badan)],
+                        ["Jarak ke Sekolah", fv(s.jarak_sekolah)],
+                        ["Jumlah Saudara Kandung", fv(s.jumlah_saudara)]
+                    ]
+                },
+                {
+                    title: "VII. RIWAYAT PENDIDIKAN",
+                    data: [
+                        ["Asal Sekolah (TK/PAUD)", fv(s.asal_sekolah)],
+                        ["NPSN Sekolah Asal", fv(s.npsn_asal)]
                     ]
                 }
             ];
 
             let startY = 45;
+            const pageHeight = 280;
+            
             sections.forEach(sec => {
+                // Estimate height: header (10) + rows * 7
+                const estimatedHeight = 10 + sec.data.length * 7;
+                if (startY + estimatedHeight > pageHeight) {
+                    doc.addPage();
+                    startY = 20;
+                }
+                
                 doc.autoTable({
                     startY: startY,
                     head: [[{ content: sec.title, colSpan: 2 }]],
                     body: sec.data,
                     theme: 'grid',
-                    styles: { font: "times" },
+                    styles: { font: "times", cellPadding: 2 },
                     headStyles: { fillColor: [30, 58, 138], fontSize: 9, fontStyle: 'bold' },
-                    bodyStyles: { fontSize: 8 },
-                    columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' } },
+                    bodyStyles: { fontSize: 8.5 },
+                    columnStyles: { 
+                        0: { cellWidth: 55, fontStyle: 'bold', textColor: [60, 60, 60] },
+                        1: { cellWidth: 115 }
+                    },
                     margin: { left: 20, right: 20 }
                 });
-                startY = doc.lastAutoTable.finalY + 5;
+                startY = doc.lastAutoTable.finalY + 4;
             });
 
             // Footer per page
-            doc.setFontSize(8);
-            doc.setTextColor(150);
-            doc.setFont("times", "normal");
-            doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 20, 285);
-            doc.text(`Halaman ${index + 1} dari ${total}`, 190, 285, { align: "right" });
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(7.5);
+                doc.setTextColor(150);
+                doc.setFont("times", "italic");
+                doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')} | ${schoolName}`, 20, 290);
+                doc.text(`Halaman ${i} dari ${pageCount}`, 190, 290, { align: "right" });
+            }
         },
 
         exportSingleToPDF(s) {
@@ -708,7 +761,7 @@ document.addEventListener('alpine:init', () => {
             const headerStyle = {
                 font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10, name: "Times New Roman" },
                 fill: { fgColor: { rgb: "1E3A8A" } },
-                alignment: { horizontal: "center", vertical: "center" },
+                alignment: { horizontal: "center", vertical: "center", wrapText: true },
                 border: {
                     top: { style: "thin" }, bottom: { style: "thin" },
                     left: { style: "thin" }, right: { style: "thin" }
@@ -717,7 +770,7 @@ document.addEventListener('alpine:init', () => {
 
             const dataStyle = {
                 font: { sz: 9, name: "Times New Roman" },
-                alignment: { vertical: "center" },
+                alignment: { vertical: "center", wrapText: true },
                 border: {
                     top: { style: "thin" }, bottom: { style: "thin" },
                     left: { style: "thin" }, right: { style: "thin" }
@@ -725,85 +778,154 @@ document.addEventListener('alpine:init', () => {
             };
 
             const titleStyle = {
-                font: { bold: true, sz: 20, color: { rgb: "1E3A8A" }, name: "Times New Roman" },
+                font: { bold: true, sz: 18, color: { rgb: "1E3A8A" }, name: "Times New Roman" },
                 alignment: { horizontal: "left", vertical: "center" }
             };
 
-            // 2. Prepare Headers
+            const sectionStyle = {
+                font: { bold: true, sz: 9, color: { rgb: "FFFFFF" }, name: "Times New Roman" },
+                fill: { fgColor: { rgb: "D97706" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                    top: { style: "thin" }, bottom: { style: "thin" },
+                    left: { style: "thin" }, right: { style: "thin" }
+                }
+            };
+
+            // 2. Complete Header Mapping (matching PDF sections)
             const headerMapping = {
-                'nama_lengkap': 'NAMA LENGKAP',
+                // I. Data Registrasi
                 'jenis_pendaftaran': 'JENIS PENDAFTARAN',
                 'kelas': 'KELAS TUJUAN',
-                'nisn': 'NISN',
+                'hobi': 'HOBI',
+                'cita_cita': 'CITA-CITA',
+                // II. Identitas Peserta Didik
+                'nama_lengkap': 'NAMA LENGKAP',
                 'nik': 'NIK',
+                'nisn': 'NISN',
                 'no_telepon': 'NO. TELEPON/WA',
                 'tempat_lahir': 'TEMPAT LAHIR',
                 'tanggal_lahir': 'TANGGAL LAHIR',
+                'no_akta': 'NO. AKTA KELAHIRAN',
                 'jenis_kelamin': 'JENIS KELAMIN',
                 'agama': 'AGAMA',
-                'hobi': 'HOBI',
-                'cita_cita': 'CITA-CITA',
-                'alamat': 'ALAMAT',
+                'alamat': 'ALAMAT LENGKAP',
                 'tempat_tinggal': 'TEMPAT TINGGAL',
                 'transportasi': 'TRANSPORTASI',
-                'jarak_sekolah': 'JARAK SEKOLAH',
+                // III. Data Ayah
                 'nama_ayah': 'NAMA AYAH',
+                'nik_ayah': 'NIK AYAH',
+                'tahun_lahir_ayah': 'THN LAHIR AYAH',
+                'pendidikan_ayah': 'PENDIDIKAN AYAH',
                 'pekerjaan_ayah': 'PEKERJAAN AYAH',
+                'penghasilan_ayah': 'PENGHASILAN AYAH',
+                // IV. Data Ibu
                 'nama_ibu': 'NAMA IBU',
+                'nik_ibu': 'NIK IBU',
+                'tahun_lahir_ibu': 'THN LAHIR IBU',
+                'pendidikan_ibu': 'PENDIDIKAN IBU',
                 'pekerjaan_ibu': 'PEKERJAAN IBU',
+                'penghasilan_ibu': 'PENGHASILAN IBU',
+                // V. Data Wali
+                'nama_wali': 'NAMA WALI',
+                'nik_wali': 'NIK WALI',
+                'tahun_lahir_wali': 'THN LAHIR WALI',
+                'pendidikan_wali': 'PENDIDIKAN WALI',
+                'pekerjaan_wali': 'PEKERJAAN WALI',
+                'penghasilan_wali': 'PENGHASILAN WALI',
+                // VI. Data Periodik
+                'tinggi_badan': 'TINGGI BADAN (CM)',
+                'berat_badan': 'BERAT BADAN (KG)',
+                'jarak_sekolah': 'JARAK SEKOLAH',
+                'jumlah_saudara': 'JML SAUDARA',
+                // VII. Riwayat Pendidikan
                 'asal_sekolah': 'ASAL SEKOLAH',
                 'npsn_asal': 'NPSN ASAL',
+                // Meta
                 'status': 'STATUS',
                 'created_at': 'TGL DAFTAR'
             };
 
             const keys = Object.keys(headerMapping);
+
+            // 3. Build Section Header Row (orange row showing section groupings)
+            const sectionGroups = [
+                { label: 'REGISTRASI', count: 4 },
+                { label: 'IDENTITAS PESERTA DIDIK', count: 12 },
+                { label: 'DATA AYAH', count: 6 },
+                { label: 'DATA IBU', count: 6 },
+                { label: 'DATA WALI', count: 6 },
+                { label: 'PERIODIK', count: 4 },
+                { label: 'RIWAYAT PENDIDIKAN', count: 2 },
+                { label: 'META', count: 2 }
+            ];
+
+            const sectionRow = [];
+            sectionGroups.forEach(g => {
+                sectionRow.push({ v: g.label, s: sectionStyle });
+                for (let i = 1; i < g.count; i++) {
+                    sectionRow.push({ v: '', s: sectionStyle });
+                }
+            });
+
             const headers = keys.map(k => ({ v: headerMapping[k], s: headerStyle }));
 
-            // 3. Prepare Rows
+            // 4. Prepare Data Rows
             const rows = this.filteredStudents.map(s => {
                 return keys.map(k => {
                     let val = s[k];
                     if (k === 'kelas' && s.jenis_pendaftaran !== 'Pindahan') val = 'Kelas 1';
                     if (k === 'tanggal_lahir' || k === 'created_at') {
                         const d = new Date(val);
-                        val = isNaN(d.getTime()) ? val : d.toLocaleDateString('id-ID');
+                        val = isNaN(d.getTime()) ? val : d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
                     }
                     return { v: String(val || "-"), s: dataStyle, t: 's' };
                 });
             });
 
-            // 4. Combine into AOE (Array of Objects)
+            // 5. Build Worksheet
             const schoolName = this.settings.school_name || "SDN MEKARSARI";
             const titleRow = [{ v: `REKAPITULASI DATA PENDAFTAR SISWA - ${schoolName}`, s: titleStyle }];
             
-            // Build the worksheet data
             const wsData = [
                 titleRow, 
                 [], // Spacer
+                sectionRow,
                 headers,
                 ...rows
             ];
 
             const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-            // 5. Merges & Column Widths
-            ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: keys.length - 1 } }];
+            // 6. Merges
+            const merges = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: keys.length - 1 } } // Title row merge
+            ];
             
+            // Section header merges (row index 2)
+            let colOffset = 0;
+            sectionGroups.forEach(g => {
+                if (g.count > 1) {
+                    merges.push({ s: { r: 2, c: colOffset }, e: { r: 2, c: colOffset + g.count - 1 } });
+                }
+                colOffset += g.count;
+            });
+            ws['!merges'] = merges;
+            
+            // 7. Autofit Column Widths
             const colWidths = keys.map((k, i) => {
                 const headerLen = headerMapping[k].length;
-                const contents = rows.map(r => String(r[i].v).length);
-                const maxContentLen = Math.max(headerLen, ...contents);
-                // Menyesuaikan lebar kolom dengan isi teks + padding ekstra agar tidak terpotong
-                return { wch: maxContentLen + 5 };
+                const contentLengths = rows.map(r => String(r[i].v).length);
+                const maxLen = Math.max(headerLen, ...contentLengths, 8);
+                return { wch: Math.min(maxLen + 4, 45) }; // Cap at 45 chars width
             });
             ws['!cols'] = colWidths;
-            ws['!rows'] = [{ hpt: 40 }]; // Menambah tinggi baris judul agar font 20 muat dengan rapi
+            ws['!rows'] = [{ hpt: 40 }, {}, { hpt: 22 }, { hpt: 28 }]; // Title, spacer, section, header heights
 
-            // 6. Save
+            // 8. Save
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Pendaftar");
-            XLSX.writeFile(wb, `Rekap_Professional_Excel_${Date.now()}.xlsx`);
+            XLSX.writeFile(wb, `Rekap_Lengkap_Excel_${Date.now()}.xlsx`);
         },
 
         exportStudentsPDF() {
